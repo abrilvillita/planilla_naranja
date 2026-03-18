@@ -50,17 +50,20 @@ input, select {
 
 <script>
 
-// 🔑 PEGA TUS DATOS AQUÍ
+// 🔑 CONFIG
 const SUPABASE_URL = "https://bwqgitkxwtdfogbexzbj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_35vtzbLtCkQt8yevQ4PF-A_3oyRO93W";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ⚠️ IMPORTANTE: usamos OTRO nombre (no "supabase")
+const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // 📥 CARGAR DATOS
 async function load() {
-    const { data, error } = await supabase.from('tareas').select('*');
+    const { data, error } = await client.from('tareas').select('*');
 
     if (error) {
-        console.error("ERROR:", error);
+        console.error(error);
+        document.getElementById("app").innerHTML = "Error cargando datos";
         return;
     }
 
@@ -105,18 +108,19 @@ function render(tareas) {
 
 // 🔄 ACTUALIZAR
 async function update(id, field, value) {
-    await supabase.from('tareas').update({ [field]: value }).eq('id', id);
+    await client
+        .from('tareas')
+        .update({ [field]: value })
+        .eq('id', id);
 }
 
 // 🔴 TIEMPO REAL
-supabase
+client
   .channel('tareas-changes')
   .on(
     'postgres_changes',
     { event: '*', schema: 'public', table: 'tareas' },
-    payload => {
-        load();
-    }
+    () => load()
   )
   .subscribe();
 
