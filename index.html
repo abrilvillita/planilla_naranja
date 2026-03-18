@@ -64,6 +64,11 @@ async function load() {
         return;
     }
 
+    if (!data || data.length === 0) {
+        document.getElementById("app").innerHTML = "No hay tareas aún";
+        return;
+    }
+
     render(data);
 }
 
