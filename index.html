@@ -57,7 +57,13 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // 📥 CARGAR DATOS
 async function load() {
-    const { data } = await supabase.from('tareas').select('*');
+    const { data, error } = await supabase.from('tareas').select('*');
+
+    if (error) {
+        console.error("ERROR:", error);
+        return;
+    }
+
     render(data);
 }
 
