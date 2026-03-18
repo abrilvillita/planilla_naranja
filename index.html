@@ -7,65 +7,100 @@
 <style>
 body {
     font-family: -apple-system, BlinkMacSystemFont;
-    background: #f5f5f7;
+    background: linear-gradient(135deg, #fff7ed, #ffedd5);
     margin: 0;
 }
 
+/* HEADER */
 header {
     background: white;
     padding: 20px;
-    font-size: 22px;
-    border-bottom: 1px solid #ddd;
+    font-size: 24px;
+    font-weight: 600;
+    border-bottom: 1px solid #eee;
 }
 
+/* CONTENEDOR */
 .container {
     padding: 20px;
+    max-width: 900px;
+    margin: auto;
 }
 
+/* BOTÓN */
+button {
+    background: #ff6a00;
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+/* TARJETAS */
 .card {
-    background: white;
-    border-radius: 15px;
-    padding: 15px;
-    margin-bottom: 15px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    transition: 0.2s;
 }
 
+.card:hover {
+    transform: scale(1.02);
+}
+
+/* INPUTS */
 input, select {
     width: 100%;
-    padding: 8px;
+    padding: 10px;
     margin-top: 5px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
 }
-</style>
 
+/* ESTADOS */
+.badge {
+    padding: 5px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+}
+
+.pendiente { background: #fde68a; }
+.proceso { background: #93c5fd; }
+.listo { background: #86efac; }
+
+</style>
 </head>
 
 <body>
 
-<header>Planilla Naranja - Dashboard</header>
-<div class="container" id="app"></div>
+<header>🍊 Planilla Naranja</header>
+
+<div class="container">
+
+<button onclick="crear()">➕ Nueva tarea</button>
+
+<div id="app"></div>
+
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
 <script>
-
-// 🔑 CONFIG
 const SUPABASE_URL = "https://bwqgitkxwtdfogbexzbj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_35vtzbLtCkQt8yevQ4PF-A_3oyRO93W";
 
-// ⚠️ IMPORTANTE: usamos OTRO nombre (no "supabase")
 const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// 📥 CARGAR DATOS
+// 📥 CARGAR
 async function load() {
-    const { data, error } = await client.from('tareas').select('*');
-
-    if (error) {
-        console.error(error);
-        document.getElementById("app").innerHTML = "Error cargando datos";
-        return;
-    }
+    const { data } = await client.from('tareas').select('*').order('id');
 
     if (!data || data.length === 0) {
         document.getElementById("app").innerHTML = "No hay tareas aún";
@@ -77,22 +112,31 @@ async function load() {
 
 // 🎨 RENDER
 function render(tareas) {
-    const container = document.getElementById("app");
-    container.innerHTML = "";
+    const app = document.getElementById("app");
+    app.innerHTML = "";
 
     tareas.forEach(t => {
+
+        let estadoClass = "pendiente";
+        if (t.estado === "En proceso") estadoClass = "proceso";
+        if (t.estado === "Listo") estadoClass = "listo";
+
         const div = document.createElement("div");
         div.className = "card";
 
         div.innerHTML = `
-            <b>${t.nombre}</b><br>
+            <h3>${t.nombre}</h3>
+            <span class="badge ${estadoClass}">${t.estado}</span><br><br>
+
             Tipo: ${t.tipo}<br><br>
 
             Responsable:
-            <input value="${t.responsable || ""}" onchange="update(${t.id}, 'responsable', this.value)">
+            <input value="${t.responsable || ""}" 
+            onchange="update(${t.id}, 'responsable', this.value)">
 
             Costo:
-            <input value="${t.costo || ""}" onchange="update(${t.id}, 'costo', this.value)">
+            <input value="${t.costo || ""}" 
+            onchange="update(${t.id}, 'costo', this.value)">
 
             Estado:
             <select onchange="update(${t.id}, 'estado', this.value)">
@@ -100,33 +144,48 @@ function render(tareas) {
                 <option ${t.estado=="En proceso"?"selected":""}>En proceso</option>
                 <option ${t.estado=="Listo"?"selected":""}>Listo</option>
             </select>
+
+            <button onclick="eliminar(${t.id})" style="background:#ef4444;">Eliminar</button>
         `;
 
-        container.appendChild(div);
+        app.appendChild(div);
     });
 }
 
-// 🔄 ACTUALIZAR
-async function update(id, field, value) {
-    await client
-        .from('tareas')
-        .update({ [field]: value })
-        .eq('id', id);
+// ➕ CREAR
+async function crear() {
+    const nombre = prompt("Nombre de la tarea");
+    if (!nombre) return;
+
+    await client.from('tareas').insert([{
+        nombre,
+        tipo: "Nuevo",
+        estado: "Pendiente"
+    }]);
+
+    load();
 }
 
-// 🔴 TIEMPO REAL
+// 🔄 UPDATE
+async function update(id, field, value) {
+    await client.from('tareas').update({ [field]: value }).eq('id', id);
+}
+
+// ❌ ELIMINAR
+async function eliminar(id) {
+    await client.from('tareas').delete().eq('id', id);
+}
+
+// 🔴 REALTIME
 client
-  .channel('tareas-changes')
-  .on(
-    'postgres_changes',
+  .channel('tareas')
+  .on('postgres_changes',
     { event: '*', schema: 'public', table: 'tareas' },
     () => load()
   )
   .subscribe();
 
-// 🚀 INICIAR
 load();
-
 </script>
 
 </body>
