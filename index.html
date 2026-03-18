@@ -3,34 +3,130 @@
 <head>
 <meta charset="UTF-8">
 <title>Planilla Naranja</title>
+
+<style>
+body {
+    font-family: -apple-system, BlinkMacSystemFont;
+    background: #f5f5f7;
+    margin: 0;
+}
+
+header {
+    background: white;
+    padding: 20px;
+    font-size: 22px;
+    border-bottom: 1px solid #ddd;
+}
+
+.container {
+    padding: 20px;
+}
+
+.card {
+    background: white;
+    border-radius: 15px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+}
+
+input, select {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+</style>
+
 </head>
 
 <body>
 
-<h1>Planilla Naranja - Dashboard</h1>
-<div id="app"></div>
+<header>Planilla Naranja - Dashboard</header>
+<div class="container" id="app"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
 <script>
+
+// 🔑 CONFIG
 const SUPABASE_URL = "https://bwqgitkxwtdfogbexzbj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_35vtzbLtCkQt8yevQ4PF-A_3oyRO93W";
 
+// ⚠️ IMPORTANTE: usamos OTRO nombre (no "supabase")
 const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// 📥 CARGAR DATOS
 async function load() {
     const { data, error } = await client.from('tareas').select('*');
 
     if (error) {
         console.error(error);
-        document.getElementById("app").innerText = "Error";
+        document.getElementById("app").innerHTML = "Error cargando datos";
         return;
     }
 
-    document.getElementById("app").innerText = JSON.stringify(data, null, 2);
+    if (!data || data.length === 0) {
+        document.getElementById("app").innerHTML = "No hay tareas aún";
+        return;
+    }
+
+    render(data);
 }
 
+// 🎨 RENDER
+function render(tareas) {
+    const container = document.getElementById("app");
+    container.innerHTML = "";
+
+    tareas.forEach(t => {
+        const div = document.createElement("div");
+        div.className = "card";
+
+        div.innerHTML = `
+            <b>${t.nombre}</b><br>
+            Tipo: ${t.tipo}<br><br>
+
+            Responsable:
+            <input value="${t.responsable || ""}" onchange="update(${t.id}, 'responsable', this.value)">
+
+            Costo:
+            <input value="${t.costo || ""}" onchange="update(${t.id}, 'costo', this.value)">
+
+            Estado:
+            <select onchange="update(${t.id}, 'estado', this.value)">
+                <option ${t.estado=="Pendiente"?"selected":""}>Pendiente</option>
+                <option ${t.estado=="En proceso"?"selected":""}>En proceso</option>
+                <option ${t.estado=="Listo"?"selected":""}>Listo</option>
+            </select>
+        `;
+
+        container.appendChild(div);
+    });
+}
+
+// 🔄 ACTUALIZAR
+async function update(id, field, value) {
+    await client
+        .from('tareas')
+        .update({ [field]: value })
+        .eq('id', id);
+}
+
+// 🔴 TIEMPO REAL
+client
+  .channel('tareas-changes')
+  .on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'tareas' },
+    () => load()
+  )
+  .subscribe();
+
+// 🚀 INICIAR
 load();
+
 </script>
 
 </body>
